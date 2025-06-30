@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Python Compiler</title>
+    <link href="data/img/favicon.ico" rel="icon" type="image/x-icon" />
+    <script src="data/js/ace-builds/src-noconflict/ace.js" type="text/javascript"></script>
+    <script src="data/js/ace-builds/src-noconflict/ext-language_tools.js" type="text/javascript"></script>
+    <script src="data/js/skulpt/skulpt.js" type="text/javascript"></script>
+    <script src="data/js/skulpt/skulpt-stdlib.js" type="text/javascript"></script>
+    <link href="data/css/style.css" rel="stylesheet">
+    <link href="data/fonts/fontawesome-free-6.1.1-web/css/fontawesome.min.css" rel="stylesheet">
+    <link href="data/fonts/fontawesome-free-6.1.1-web/css/solid.min.css" rel="stylesheet">
+    <link href="data/fonts/fontawesome-free-6.1.1-web/css/brands.min.css" rel="stylesheet">
+
+</head>
+
+<body>
+    <div id="wrapper">
+        <div class="topnav" id="myTopnav">
+            <a onclick="main()">Run</a>
+            <input type="file" />
+            <a onclick="document.querySelector('input').click()">Open</a>
+            <a onclick="toggleConsole()">Console</a>
+            <a onclick="saveCode()">Save</a>
+            <a onclick="downloadCode()">Download</a>
+            <a onclick="shareCode()">Share</a>
+            <a onclick="kbShortcuts()">Keyboard</a>
+            <a onclick="aceSettings()">Settings</a>
+            <a id="github" href="https://github.com/ishaanbhimwal/online-python-compiler" target="_blank"><i
+                    class="fa-brands fa-github"></i></a>
+            <a href="javascript:void(0);" class="icon" onclick="resPanel()">
+                <i class="fa-solid fa-bars"></i>
+            </a>
+        </div>
+        <div id="editor"><pre>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import random
+import time
+from collections import deque
+from typing import List, Optional, Tuple, Set
+import uuid
+
+class Person:
+    """Representa una persona en el árbol genealógico"""
+    
+    def __init__(self, name: str, age: int, gender: str, level: int):
+        self.id = str(uuid.uuid4())[:8]
+        self.name = name
+        self.age = age
+        self.gender = gender
+        self.level = level
+        self.children: List['Person'] = []
+        self.parent: Optional['Person'] = None
+    
+    def add_child(self, child: 'Person'):
+        """Añade un hijo a esta persona"""
+        child.parent = self
+        self.children.append(child)
+    
+    def __str__(self):
+        return f"{self.name} ({self.age} años, {self.gender}, Nivel {self.level})"
+
+class SearchResult:
+    """Resultado de una búsqueda en el árbol"""
+    
+    def __init__(self, person: Optional[Person], found: bool, visited_nodes: int, 
+                 execution_time: float, visited_order: List[Person]):
+        self.person = person
+        self.found = found
+        self.visited_nodes = visited_nodes
+        self.execution_time = execution_time
+        self.visited_order = visited_order
+
+class PersonGenerator:
+    """Generador de personas aleatorias"""
+    
+    MALE_NAMES = [
+        'Alexander', 'Benjamin', 'Carlos', 'David', 'Eduardo', 'Fernando', 'Gabriel', 'Héctor',
+        'Ignacio', 'Javier', 'Lorenzo', 'Manuel', 'Nicolás', 'Óscar', 'Pablo', 'Rafael',
+        'Sebastián', 'Tomás', 'Vicente', 'William'
+    ]
+    
+    FEMALE_NAMES = [
+        'Alejandra', 'Beatriz', 'Carmen', 'Diana', 'Elena', 'Fernanda', 'Gabriela', 'Isabel',
+        'Juana', 'Laura', 'María', 'Natalia', 'Olivia', 'Patricia', 'Rosa', 'Sofía',
+        'Teresa', 'Valentina', 'Ximena', 'Yolanda'
+    ]
+    
+    SURNAMES = [
+        'García', 'Rodríguez', 'González', 'Fernández', 'López', 'Martínez', 'Sánchez', 'Pérez',
+        'Gómez', 'Martín', 'Jiménez', 'Ruiz', 'Hernández', 'Díaz', 'Moreno', 'Muñoz',
+        'Álvarez', 'Romero', 'Alonso', 'Gutiérrez'
+    ]
+    
+    @classmethod
+    def generate_random_person(cls, level: int) -> Person:
+        """Genera una persona aleatoria"""
+        gender = random.choice(['masculino', 'femenino'])
+        
+        if gender == 'masculino':
+            first_name = random.choice(cls.MALE_NAMES)
+        else:
+            first_name = random.choice(cls.FEMALE_NAMES)
+        
+        surname = random.choice(cls.SURNAMES)
+        name = f"{first_name} {surname}"
+        
+        # Rangos de edad por nivel (0 = generación más antigua)
+        age_ranges = [
+            (70, 90),  # Nivel 0: Bisabuelos
+            (45, 70),  # Nivel 1: Abuelos
+            (25, 50),  # Nivel 2: Padres
+            (5, 30)    # Nivel 3: Hijos
+        ]
+        
+        min_age, max_age = age_ranges[min(level, 3)]
+        age = random.randint(min_age, max_age)
+        
+        return Person(name, age, gender, level)
+
+class TreeGenerator:
+    """Generador de árboles genealógicos"""
+    
+    @staticmethod
+    def generate_family_tree(max_levels: int, max_nodes: int) -> Person:
+        """Genera un árbol genealógico aleatorio asegurando todos los niveles y nodos"""
+        root = PersonGenerator.generate_random_person(0)
+        all_nodes = [root]
+        node_count = 1
+        
+        # Asegurar que se generen todos los niveles
+        for level in range(max_levels - 1):
+            current_level_nodes = [node for node in all_nodes if node.level == level]
+            
+            # Si no hay nodos en el nivel actual, no podemos continuar
+            if not current_level_nodes:
+                break
+            
+            # Calcular cuántos nodos necesitamos para este nivel
+            remaining_nodes = max_nodes - node_count
+            remaining_levels = max_levels - level - 1
+            
+            if remaining_nodes <= 0:
+                break
+            
+            # Distribuir los nodos restantes entre los padres disponibles
+            nodes_per_parent = max(1, remaining_nodes // len(current_level_nodes))
+            extra_nodes = remaining_nodes % len(current_level_nodes)
+            
+            # Asegurar que cada padre tenga al menos un hijo si hay espacio
+            for i, parent in enumerate(current_level_nodes):
+                if node_count >= max_nodes:
+                    break
+                
+                # Calcular cuántos hijos debe tener este padre
+                base_children = min(nodes_per_parent, remaining_nodes)
+                extra_child = 1 if i < extra_nodes else 0
+                children_count = base_children + extra_child
+                
+                # Limitar el número de hijos por padre (máximo 4)
+                children_count = min(children_count, 4)
+                
+                # Si es el último nivel, asegurar que se usen todos los nodos restantes
+                if level == max_levels - 2:  # Último nivel de padres
+                    remaining_space = max_nodes - node_count
+                    children_count = min(children_count, remaining_space)
+                
+                # Generar los hijos
+                for j in range(children_count):
+                    if node_count >= max_nodes:
+                        break
+                    
+                    child = PersonGenerator.generate_random_person(level + 1)
+                    parent.add_child(child)
+                    all_nodes.append(child)
+                    node_count += 1
+                    remaining_nodes -= 1
+        
+        # Si aún no hemos alcanzado el número máximo de nodos y tenemos niveles disponibles,
+        # agregar más nodos a los padres existentes
+        while node_count < max_nodes:
+            # Buscar padres que puedan tener más hijos
+            potential_parents = [node for node in all_nodes 
+                               if node.level < max_levels - 1 and len(node.children) < 4]
+            
+            if not potential_parents:
+                break
+            
+            # Seleccionar un padre aleatorio y agregarle un hijo
+            parent = random.choice(potential_parents)
+            child = PersonGenerator.generate_random_person(parent.level + 1)
+            parent.add_child(child)
+            all_nodes.append(child)
+            node_count += 1
+        
+        return root
+    
+    @staticmethod
+    def get_all_nodes(root: Person) -> List[Person]:
+        """Obtiene todos los nodos del árbol"""
+        nodes = []
+        queue = deque([root])
+        
+        while queue:
+            current = queue.popleft()
+            nodes.append(current)
+            queue.extend(current.children)
+        
+        return nodes
+
+class SearchAlgorithms:
+    """Algoritmos de búsqueda en árboles"""
+    
+    @staticmethod
+    def breadth_first_search(root: Person, target_name: str) -> SearchResult:
+        """Búsqueda en anchura (BFS)"""
+        start_time = time.time()
+        queue = deque([root])
+        visited = set()
+        visited_order = []
+        visited_nodes = 0
+        
+        while queue:
+            current = queue.popleft()
+            visited_nodes += 1
+            
+            if current.id in visited:
+                continue
+                
+            visited.add(current.id)
+            visited_order.append(current)
+            
+            if target_name.lower() in current.name.lower():
+                end_time = time.time()
+                return SearchResult(
+                    current, True, visited_nodes, 
+                    (end_time - start_time) * 1000, visited_order
+                )
+            
+            queue.extend(current.children)
+        
+        end_time = time.time()
+        return SearchResult(
+            None, False, visited_nodes, 
+            (end_time - start_time) * 1000, visited_order
+        )
+    
+    @staticmethod
+    def depth_first_search(root: Person, target_name: str) -> SearchResult:
+        """Búsqueda en profundidad (DFS)"""
+        start_time = time.time()
+        visited = set()
+        visited_order = []
+        visited_nodes = 0
+        
+        def dfs_recursive(node: Person) -> Optional[Person]:
+            nonlocal visited_nodes
+            
+            if node.id in visited:
+                return None
+            
+            visited.add(node.id)
+            visited_nodes += 1
+            visited_order.append(node)
+            
+            if target_name.lower() in node.name.lower():
+                return node
+            
+            for child in node.children:
+                result = dfs_recursive(child)
+                if result:
+                    return result
+            
+            return None
+        
+        result = dfs_recursive(root)
+        end_time = time.time()
+        
+        return SearchResult(
+            result, result is not None, visited_nodes,
+            (end_time - start_time) * 1000, visited_order
+        )
+
+class TreeVisualizer:
+    """Visualizador de árboles genealógicos"""
+    
+    @staticmethod
+    def print_complete_tree(root: Person, prefix: str = "", is_last: bool = True):
+        """Imprime el árbol genealógico completo"""
+        connector = "└── " if is_last else "├── "
+        print(f"{prefix}{connector}{root}")
+        
+        if root.children:
+            for i, child in enumerate(root.children):
+                is_last_child = i == len(root.children) - 1
+                extension = "    " if is_last else "│   "
+                TreeVisualizer.print_complete_tree(
+                    child, prefix + extension, is_last_child
+                )
+    
+    @staticmethod
+    def print_search_tree(visited_nodes: List[Person], found_person: Optional[Person], 
+                         algorithm_name: str):
+        """Imprime el árbol de búsqueda mostrando solo nodos visitados"""
+        print(f"\n{'='*60}")
+        print(f"ÁRBOL DE BÚSQUEDA {algorithm_name.upper()}")
+        print(f"{'='*60}")
+        
+        if not visited_nodes:
+            print("No se visitaron nodos durante la búsqueda.")
+            return
+        
+        # Crear un mapeo de nodos visitados
+        visited_set = {node.id for node in visited_nodes}
+        visit_order = {node.id: i + 1 for i, node in enumerate(visited_nodes)}
+        
+        def print_visited_tree(node: Person, prefix: str = "", is_last: bool = True, 
+                              parent_visited: bool = True):
+            if node.id not in visited_set:
+                return
+            
+            connector = "└── " if is_last else "├── "
+            order = visit_order.get(node.id, 0)
+            found_marker = " *** ENCONTRADO ***" if found_person and node.id == found_person.id else ""
+            
+            print(f"{prefix}{connector}[{order:2d}] {node}{found_marker}")
+            
+            # Solo mostrar hijos que fueron visitados
+            visited_children = [child for child in node.children if child.id in visited_set]
+            
+            if visited_children:
+                for i, child in enumerate(visited_children):
+                    is_last_child = i == len(visited_children) - 1
+                    extension = "    " if is_last else "│   "
+                    print_visited_tree(
+                        child, prefix + extension, is_last_child, True
+                    )
+        
+        # Encontrar la raíz del árbol de búsqueda
+        root_node = visited_nodes[0]
+        print_visited_tree(root_node)
+        
+        print(f"\nLeyenda: [XX] = Orden de visita durante {algorithm_name}")
+        if found_person:
+            print(f"*** ENCONTRADO *** = Persona encontrada: {found_person.name}")
+
+class GenealogyApp:
+    """Aplicación principal del árbol genealógico"""
+    
+    def __init__(self):
+        self.family_tree: Optional[Person] = None
+        self.all_persons: List[Person] = []
+    
+    def print_header(self):
+        """Imprime el encabezado de la aplicación"""
+        print("\n" + "="*80)
+        print("🌳 APLICACIÓN DE ÁRBOL GENEALÓGICO CON BÚSQUEDA 🌳")
+        print("="*80)
+        print("Genera árboles familiares aleatorios y busca usando algoritmos BFS y DFS")
+        print("="*80)
+    
+    def get_tree_configuration(self) -> Tuple[int, int]:
+        """Solicita la configuración del árbol al usuario"""
+        print("\n📋 CONFIGURACIÓN DEL ÁRBOL GENEALÓGICO")
+        print("-" * 50)
+        
+        while True:
+            try:
+                max_levels = int(input("Ingrese el número máximo de niveles (1-4): "))
+                if 1 <= max_levels <= 4:
+                    break
+                else:
+                    print("❌ Por favor, ingrese un número entre 1 y 4.")
+            except ValueError:
+                print("❌ Por favor, ingrese un número válido.")
+        
+        while True:
+            try:
+                max_nodes = int(input("Ingrese el número máximo de nodos (1-25): "))
+                if 1 <= max_nodes <= 25:
+                    break
+                else:
+                    print("❌ Por favor, ingrese un número entre 1 y 25.")
+            except ValueError:
+                print("❌ Por favor, ingrese un número válido.")
+        
+        return max_levels, max_nodes
+    
+    def generate_tree(self, max_levels: int, max_nodes: int):
+        """Genera el árbol genealógico"""
+        print(f"\n🔄 Generando árbol genealógico con {max_levels} niveles y máximo {max_nodes} nodos...")
+        
+        self.family_tree = TreeGenerator.generate_family_tree(max_levels, max_nodes)
+        self.all_persons = TreeGenerator.get_all_nodes(self.family_tree)
+        
+        # Verificar que se generaron todos los niveles solicitados
+        levels_generated = set(person.level for person in self.all_persons)
+        max_level_generated = max(levels_generated) if levels_generated else 0
+        
+        print(f"✅ Árbol generado exitosamente:")
+        print(f"   📊 Total de personas: {len(self.all_persons)}")
+        print(f"   📈 Niveles generados: {max_level_generated + 1} (0-{max_level_generated})")
+        print(f"   🎯 Objetivo: {max_levels} niveles, {max_nodes} nodos máximo")
+        
+        # Mostrar distribución por niveles
+        level_counts = {}
+        for person in self.all_persons:
+            level_counts[person.level] = level_counts.get(person.level, 0) + 1
+        
+        print(f"   📋 Distribución por niveles:")
+        for level in sorted(level_counts.keys()):
+            level_names = ["Ancestros", "Abuelos", "Padres", "Hijos"]
+            level_name = level_names[min(level, 3)]
+            print(f"      Nivel {level} ({level_name}): {level_counts[level]} personas")
+    
+    def display_complete_tree(self):
+        """Muestra el árbol genealógico completo"""
+        if not self.family_tree:
+            print("❌ No hay árbol genealógico generado.")
+            return
+        
+        print(f"\n🌳 ÁRBOL GENEALÓGICO COMPLETO ({len(self.all_persons)} miembros)")
+        print("=" * 60)
+        TreeVisualizer.print_complete_tree(self.family_tree)
+    
+    def show_available_persons(self):
+        """Muestra las personas disponibles para búsqueda"""
+        if not self.all_persons:
+            return
+        
+        print(f"\n👥 PERSONAS DISPONIBLES EN EL ÁRBOL:")
+        print("-" * 50)
+        for i, person in enumerate(self.all_persons, 1):
+            print(f"{i:2d}. {person}")
+    
+    def get_search_term(self) -> str:
+        """Solicita el término de búsqueda al usuario"""
+        print(f"\n🔍 BÚSQUEDA DE PERSONA")
+        print("-" * 30)
+        
+        while True:
+            search_term = input("Ingrese el nombre de la persona a buscar: ").strip()
+            if search_term:
+                return search_term
+            else:
+                print("❌ Por favor, ingrese un nombre válido.")
+    
+    def perform_searches(self, search_term: str):
+        """Realiza las búsquedas BFS y DFS"""
+        if not self.family_tree:
+            print("❌ No hay árbol genealógico generado.")
+            return
+        
+        print(f"\n🔍 Buscando '{search_term}' en el árbol genealógico...")
+        print("=" * 60)
+        
+        # Búsqueda BFS
+        print("\n🔄 Ejecutando Búsqueda en Anchura (BFS)...")
+        bfs_result = SearchAlgorithms.breadth_first_search(self.family_tree, search_term)
+        
+        # Búsqueda DFS
+        print("🔄 Ejecutando Búsqueda en Profundidad (DFS)...")
+        dfs_result = SearchAlgorithms.depth_first_search(self.family_tree, search_term)
+        
+        # Mostrar resultados
+        self.display_search_results(bfs_result, dfs_result, search_term)
+        
+        # Mostrar árboles de búsqueda
+        TreeVisualizer.print_search_tree(bfs_result.visited_order, bfs_result.person, "BFS")
+        TreeVisualizer.print_search_tree(dfs_result.visited_order, dfs_result.person, "DFS")
+        
+        # Comparación de rendimiento
+        self.display_performance_comparison(bfs_result, dfs_result)
+    
+    def display_search_results(self, bfs_result: SearchResult, dfs_result: SearchResult, 
+                             search_term: str):
+        """Muestra los resultados de las búsquedas"""
+        print(f"\n📊 RESULTADOS DE BÚSQUEDA PARA: '{search_term}'")
+        print("=" * 60)
+        
+        # Resultado BFS
+        print(f"\n🔵 BÚSQUEDA EN ANCHURA (BFS):")
+        print("-" * 40)
+        if bfs_result.found:
+            print(f"✅ ENCONTRADO: {bfs_result.person}")
+        else:
+            print("❌ PERSONA NO ENCONTRADA")
+        
+        print(f"📈 Nodos visitados: {bfs_result.visited_nodes}")
+        print(f"⏱️  Tiempo de ejecución: {bfs_result.execution_time:.4f} ms")
+        
+        # Resultado DFS
+        print(f"\n🟢 BÚSQUEDA EN PROFUNDIDAD (DFS):")
+        print("-" * 40)
+        if dfs_result.found:
+            print(f"✅ ENCONTRADO: {dfs_result.person}")
+        else:
+            print("❌ PERSONA NO ENCONTRADA")
+        
+        print(f"📈 Nodos visitados: {dfs_result.visited_nodes}")
+        print(f"⏱️  Tiempo de ejecución: {dfs_result.execution_time:.4f} ms")
+    
+    def display_performance_comparison(self, bfs_result: SearchResult, dfs_result: SearchResult):
+        """Muestra la comparación de rendimiento"""
+        print(f"\n⚡ ANÁLISIS COMPARATIVO DE RENDIMIENTO")
+        print("=" * 60)
+        
+        print(f"📊 Eficiencia en nodos:")
+        if bfs_result.visited_nodes < dfs_result.visited_nodes:
+            print(f"   🏆 BFS fue más eficiente ({bfs_result.visited_nodes} vs {dfs_result.visited_nodes} nodos)")
+        elif dfs_result.visited_nodes < bfs_result.visited_nodes:
+            print(f"   🏆 DFS fue más eficiente ({dfs_result.visited_nodes} vs {bfs_result.visited_nodes} nodos)")
+        else:
+            print(f"   🤝 Ambos algoritmos visitaron la misma cantidad de nodos ({bfs_result.visited_nodes})")
+        
+        print(f"\n⏱️  Velocidad de ejecución:")
+        if bfs_result.execution_time < dfs_result.execution_time:
+            print(f"   🏆 BFS fue más rápido ({bfs_result.execution_time:.4f} vs {dfs_result.execution_time:.4f} ms)")
+        elif dfs_result.execution_time < bfs_result.execution_time:
+            print(f"   🏆 DFS fue más rápido ({dfs_result.execution_time:.4f} vs {bfs_result.execution_time:.4f} ms)")
+        else:
+            print(f"   🤝 Ambos algoritmos tuvieron tiempos similares")
+        
+        print(f"\n🧠 Características de los algoritmos:")
+        print(f"   • BFS: Explora nivel por nivel (anchura primero)")
+        print(f"   • DFS: Explora rama por rama hasta el fondo (profundidad primero)")
+    
+    def run(self):
+        """Ejecuta la aplicación principal"""
+        self.print_header()
+        
+        # Configuración del árbol
+        max_levels, max_nodes = self.get_tree_configuration()
+        
+        # Generar árbol
+        self.generate_tree(max_levels, max_nodes)
+        
+        # Mostrar árbol completo
+        self.display_complete_tree()
+        
+        # Mostrar personas disponibles
+        self.show_available_persons()
+        
+        # Búsqueda
+        search_term = self.get_search_term()
+        
+        # Realizar búsquedas
+        self.perform_searches(search_term)
+        
+        print(f"\n🎉 ¡Aplicación completada exitosamente!")
+        print("=" * 80)
+
+def main():
+    """Función principal"""
+    try:
+        app = GenealogyApp()
+        app.run()
+    except KeyboardInterrupt:
+        print("\n\n👋 Aplicación interrumpida por el usuario. ¡Hasta luego!")
+    except Exception as e:
+        print(f"\n❌ Error inesperado: {e}")
+
+if __name__ == "__main__":
+    main()</pre>
+        </div>
+        <textarea id="output"></textarea>
+    </div>
+    <script src="data/js/script.js" tpye="text/javascript"></script>
+</body>
+
+</html>
